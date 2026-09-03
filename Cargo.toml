@@ -1,0 +1,9 @@
+[package]
+name = "qcom-metadata-editor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.6.6", features = ["derive"] }
+fdt-edit = "0.2.3"
+menu_rs = "0.3.1"
