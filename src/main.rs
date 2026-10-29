@@ -58,7 +58,7 @@ fn run(cli: &Cli) -> Result<(), String> {
         .map_err(|e| format!("Failed to parse {} as a DTB: {e:?}", cli.qclinux_image))?;
 
     if cli.update {
-        return update(cli, &mut fdt);
+        return update(cli, &mut fdt, &dtb);
     }
 
     match cli.index {
@@ -89,7 +89,7 @@ fn run(cli: &Cli) -> Result<(), String> {
 
 /// Apply the requested edits to `fdt`, then write the whole tree back over the file
 /// it came from.
-fn update(cli: &Cli, fdt: &mut Fdt) -> Result<(), String> {
+fn update(cli: &Cli, fdt: &mut Fdt, dtb: &[u8]) -> Result<(), String> {
     let index = cli
         .index
         .ok_or("--update needs a config index, pass --index")?;
@@ -118,8 +118,14 @@ fn update(cli: &Cli, fdt: &mut Fdt) -> Result<(), String> {
         println!("\t\t fdt: {}", overlays.join(" "));
     }
 
-    let out = fdt.encode();
-    fs::write(&cli.qclinux_image, out.as_ref())
+    let old_total = u32::from_be_bytes(dtb[4..8].try_into().expect("parsed as a DTB")) as usize;
+    let mut out = fdt.encode().as_ref().to_vec();
+    out.extend_from_slice(dtb.get(old_total..).unwrap_or_default());
+    // External image data follows the header, keep the file size if it ends in padding
+    if out.len() > dtb.len() && out[dtb.len()..].iter().all(|&b| b == 0) {
+        out.truncate(dtb.len());
+    }
+    fs::write(&cli.qclinux_image, &out)
         .map_err(|e| format!("Failed to write {}: {e}", cli.qclinux_image))?;
     println!("Wrote {}", cli.qclinux_image);
 
